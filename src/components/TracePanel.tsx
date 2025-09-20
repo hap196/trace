@@ -1,0 +1,212 @@
+"use client";
+
+import { useState } from "react";
+import { IoArrowBack } from "react-icons/io5";
+import { IoCloudOutline } from "react-icons/io5";
+import { IoWaterOutline } from "react-icons/io5";
+import { IoFlaskOutline } from "react-icons/io5";
+import { AiOutlineLoading3Quarters } from "react-icons/ai";
+
+type CarbonData = {
+  co2: number;
+  microplastics: number;
+  waterUsage: number;
+};
+
+export default function TracePanel() {
+  const [brand, setBrand] = useState("coca-cola");
+  const [drink, setDrink] = useState("water");
+  const [location, setLocation] = useState("");
+  const [results, setResults] = useState<CarbonData | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  const calculateFootprint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCalculating(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const baseFootprint = {
+      "coca-cola": {
+        water: { co2: 0.33, microplastics: 5.2, waterUsage: 1.9 },
+        coke: { co2: 0.42, microplastics: 5.2, waterUsage: 2.5 },
+      },
+    };
+
+    const brandData = baseFootprint[brand as keyof typeof baseFootprint];
+    const footprint = brandData?.[drink as keyof typeof brandData] || {
+      co2: 0.35,
+      microplastics: 5.0,
+      waterUsage: 2.0,
+    };
+
+    setResults(footprint);
+    setIsCalculating(false);
+    setShowResults(true);
+  };
+
+  const goBackToInput = () => {
+    setShowResults(false);
+  };
+
+  return (
+    <div className="absolute top-6 left-6 bg-white/15 backdrop-blur-xl shadow-2xl rounded-2xl p-8 w-96 h-[380px] z-10 border border-white/20 flex flex-col">
+      {!showResults ? (
+        <>
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-ultra-violet mb-1">trace</h2>
+          </div>
+
+          <form onSubmit={calculateFootprint} className="space-y-5 flex-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="brand"
+                  className="block text-sm font-semibold text-ultra-violet mb-3"
+                >
+                  bottle brand
+                </label>
+                <select
+                  id="brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet font-medium shadow-sm transition-all"
+                >
+                  <option
+                    value="coca-cola"
+                    className="text-ultra-violet bg-white"
+                  >
+                    coca-cola
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="drink"
+                  className="block text-sm font-semibold text-ultra-violet mb-3"
+                >
+                  drink type
+                </label>
+                <select
+                  id="drink"
+                  value={drink}
+                  onChange={(e) => setDrink(e.target.value)}
+                  className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet font-medium shadow-sm transition-all"
+                >
+                  <option value="water" className="text-ultra-violet bg-white">
+                    water
+                  </option>
+                  <option value="coke" className="text-ultra-violet bg-white">
+                    coke
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="location"
+                className="block text-sm font-semibold text-ultra-violet mb-3"
+              >
+                location (optional)
+              </label>
+              <input
+                id="location"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g., new york, ny"
+                className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet placeholder-slate-gray font-medium shadow-sm transition-all"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isCalculating}
+              className="w-full bg-gradient-to-r from-cambridge-blue to-slate-gray text-ultra-violet py-3 px-6 rounded-xl hover:from-slate-gray hover:to-cambridge-blue hover:scale-105 hover:shadow-xl hover:border-white/50 transition-all duration-300 font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 border-2 border-white/30"
+            >
+              {isCalculating ? (
+                <>
+                  <AiOutlineLoading3Quarters className="animate-spin h-5 w-5 text-ultra-violet" />
+                  <span>calculating...</span>
+                </>
+              ) : (
+                <span>calculate impact</span>
+              )}
+            </button>
+          </form>
+        </>
+      ) : (
+        <>
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-ultra-violet mb-1">
+              environmental impact
+            </h2>
+          </div>
+          {results && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto space-y-3">
+                <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-cambridge-blue/20 rounded-full flex items-center justify-center">
+                        <IoCloudOutline className="w-4 h-4 text-cambridge-blue" />
+                      </div>
+                      <span className="text-sm font-medium text-ultra-violet">
+                        co₂ emissions
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold text-ultra-violet">
+                      {results.co2} kg
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-slate-gray/20 rounded-full flex items-center justify-center">
+                        <IoFlaskOutline className="w-4 h-4 text-slate-gray" />
+                      </div>
+                      <span className="text-sm font-medium text-ultra-violet">
+                        microplastics
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold text-ultra-violet">
+                      {results.microplastics} μg
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-ash-gray/20 rounded-full flex items-center justify-center">
+                        <IoWaterOutline className="w-4 h-4 text-ash-gray" />
+                      </div>
+                      <span className="text-sm font-medium text-ultra-violet">
+                        water usage
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold text-ultra-violet">
+                      {results.waterUsage} L
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={goBackToInput}
+                  className="flex items-center gap-2 p-2 text-slate-gray hover:text-ultra-violet hover:bg-white/10 rounded-lg transition-all"
+                >
+                  <IoArrowBack className="w-5 h-5" />
+                  <span className="text-sm font-medium">back</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
