@@ -4,6 +4,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const { auth, requiresAuth } = require("express-openid-connect");
 const User = require("./models/User");
+const Location = require("./models/Location");
 
 dotenv.config();
 
@@ -107,6 +108,18 @@ app.get("/api/users", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+app.get("/api/locations", async (req, res) => {
+  try {
+    const locations = await Location.find({}).select("-__v");
+    res.json({
+      count: locations.length,
+      locations: locations,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch locations" });
   }
 });
 

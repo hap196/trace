@@ -21,3 +21,38 @@ body {
   color: var(--foreground);
   font-family: "Funnel Sans", Arial, Helvetica, sans-serif;
 }
+
+.frosted-popup .mapboxgl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.frosted-popup .mapboxgl-popup-close-button {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  font-weight: normal;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: color 0.2s ease;
+  padding: 0;
+}
+
+.frosted-popup .mapboxgl-popup-close-button:hover {
+  color: #333;
+}
+
+.frosted-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.85) !important;
+}
