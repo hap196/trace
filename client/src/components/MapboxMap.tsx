@@ -522,7 +522,7 @@ export default function MapboxMap({
             "line-cap": "round",
           },
           paint: {
-            "line-color": "#545775", // ultra-violet color
+            "line-color": "#545775",
             "line-width": 4,
           },
         });
@@ -587,7 +587,7 @@ export default function MapboxMap({
             "line-cap": "round",
           },
           paint: {
-            "line-color": "#545775", // ultra-violet color
+            "line-color": "#545775",
             "line-width": 3,
           },
         });
@@ -652,7 +652,7 @@ export default function MapboxMap({
             "line-cap": "round",
           },
           paint: {
-            "line-color": "#545775", // ultra-violet color
+            "line-color": "#545775",
             "line-width": 3,
           },
         });
@@ -669,12 +669,6 @@ export default function MapboxMap({
   useEffect(() => {
     fetchLocations();
   }, []);
-
-  useEffect(() => {
-    if (locations.length > 0 && map.current) {
-      addLocationMarkers();
-    }
-  }, [locations, accessToken]);
 
   useEffect(() => {
     if (distributor && map.current) {
@@ -719,11 +713,7 @@ export default function MapboxMap({
           zoom: 6,
         });
 
-        map.current.on("load", () => {
-          if (locations.length > 0) {
-            addLocationMarkers();
-          }
-        });
+        map.current.on("load", () => {});
 
         map.current.on("error", (e) => {
           console.error("Map error:", e);
