@@ -7,6 +7,11 @@ import { IoWaterOutline } from "react-icons/io5";
 import { IoFlaskOutline } from "react-icons/io5";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { IoLogIn, IoLogOut, IoLocationOutline } from "react-icons/io5";
+import { 
+  calculateTotalEmissions, 
+  type RouteEmissions, 
+  type TotalEmissions 
+} from "@/utils/emissionCalculations";
 
 type CarbonData = {
   co2: number;
@@ -20,17 +25,20 @@ type TracePanelProps = {
   onUserLocationChange?: (
     location: { lat: number; lng: number } | null
   ) => void;
+  routeEmissions?: RouteEmissions;
 };
 
 export default function TracePanel({
   onDistributorChange,
   onShowDistributorPopup,
   onUserLocationChange,
+  routeEmissions,
 }: TracePanelProps) {
   const [brand, setBrand] = useState("coca-cola");
   const [drink, setDrink] = useState("water");
   const [location, setLocation] = useState("");
   const [results, setResults] = useState<CarbonData | null>(null);
+  const [totalEmissions, setTotalEmissions] = useState<TotalEmissions | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -78,6 +86,19 @@ export default function TracePanel({
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (results && routeEmissions) {
+      // Check if we have at least one route emission calculated
+      const hasRouteData = routeEmissions.lastMile || routeEmissions.distribution || routeEmissions.manufacturing;
+      
+      if (hasRouteData) {
+        const total = calculateTotalEmissions(results, routeEmissions);
+        setTotalEmissions(total);
+        setShowResults(true);
+      }
+    }
+  }, [results, routeEmissions]);
 
   const handleAuth = () => {
     if (isAuthenticated) {
@@ -195,8 +216,8 @@ export default function TracePanel({
 
     setResults(footprint);
     setIsCalculating(false);
-    setShowResults(true);
-
+    
+    // Don't show results immediately - wait for route emissions to be calculated
     setTimeout(() => {
       if (onShowDistributorPopup) {
         onShowDistributorPopup(true);
@@ -368,7 +389,7 @@ export default function TracePanel({
                       </span>
                     </div>
                     <p className="text-lg font-bold text-ultra-violet">
-                      {results.co2} kg
+                      {totalEmissions ? totalEmissions.total.co2 : results.co2} kg
                     </p>
                   </div>
                 </div>
@@ -384,7 +405,7 @@ export default function TracePanel({
                       </span>
                     </div>
                     <p className="text-lg font-bold text-ultra-violet">
-                      {results.microplastics} μg
+                      {totalEmissions ? totalEmissions.total.microplastics : results.microplastics} μg
                     </p>
                   </div>
                 </div>
@@ -400,10 +421,46 @@ export default function TracePanel({
                       </span>
                     </div>
                     <p className="text-lg font-bold text-ultra-violet">
-                      {results.waterUsage} L
+                      {totalEmissions ? totalEmissions.total.waterUsage : results.waterUsage} L
                     </p>
                   </div>
                 </div>
+
+                {totalEmissions && totalEmissions.transportation.co2 > 0 && (
+                  <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                    <div className="mb-2">
+                      <h4 className="text-sm font-semibold text-ultra-violet mb-1">
+                        Transportation Emissions
+                      </h4>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-gray">Product emissions:</span>
+                        <span className="text-ultra-violet font-medium">
+                          {totalEmissions.baseProduct.co2} kg CO₂
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-gray">Transportation:</span>
+                        <span className="text-ultra-violet font-medium">
+                          {totalEmissions.transportation.co2} kg CO₂
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-gray">Total distance:</span>
+                        <span className="text-ultra-violet font-medium">
+                          {totalEmissions.transportation.totalDistance} km
+                        </span>
+                      </div>
+                      <div className="border-t border-white/30 pt-2 flex justify-between items-center">
+                        <span className="text-ultra-violet font-semibold">Total emissions:</span>
+                        <span className="text-ultra-violet font-bold">
+                          {totalEmissions.total.co2} kg CO₂
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {distributor && (
                   <div className="p-3 bg-white/15 rounded-xl border border-white/20">

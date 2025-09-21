@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import {
+  calculateDistance,
+  calculateTransportationFootprint,
+  type RouteEmissions,
+  type TransportFootprint,
+} from "@/utils/emissionCalculations";
 
 type MapboxMapProps = {
   accessToken: string;
@@ -10,6 +16,7 @@ type MapboxMapProps = {
   distributor?: any;
   showDistributorPopup?: boolean;
   userLocation?: { lat: number; lng: number } | null;
+  onEmissionsCalculated?: (emissions: RouteEmissions) => void;
 };
 
 type Location = {
@@ -29,6 +36,7 @@ export default function MapboxMap({
   distributor,
   showDistributorPopup,
   userLocation,
+  onEmissionsCalculated,
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -55,6 +63,11 @@ export default function MapboxMap({
   const currentDistributor = useRef<any>(null);
   const currentProductionCenter = useRef<Location | null>(null);
   const currentManufacturingCenter = useRef<Location | null>(null);
+  const [routeEmissions, setRouteEmissions] = useState<RouteEmissions>({
+    lastMile: null,
+    distribution: null,
+    manufacturing: null,
+  });
 
   const geocodeAddress = async (address: string) => {
     try {
@@ -160,25 +173,6 @@ export default function MapboxMap({
     }
 
     return closestCenter;
-  };
-
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   };
 
   const addLocationMarkers = async () => {
@@ -395,7 +389,7 @@ export default function MapboxMap({
           line-height: 1.4;
         ">${productionCenter.address}</p>
         <p style="
-          margin: 0;
+          margin: 0 0 8px 0;
           font-size: 12px;
           font-weight: 500;
           color: #90B494;
@@ -460,7 +454,7 @@ export default function MapboxMap({
           line-height: 1.4;
         ">${manufacturingCenter.address}</p>
         <p style="
-          margin: 0;
+          margin: 0 0 8px 0;
           font-size: 12px;
           font-weight: 500;
           color: #DBCFB0;
@@ -497,6 +491,23 @@ export default function MapboxMap({
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0];
 
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          distributorLocation.lat,
+          distributorLocation.lng
+        );
+        const footprint = calculateTransportationFootprint(
+          distance,
+          "last-mile"
+        );
+
+        // Update route emissions
+        setRouteEmissions((prev) => ({
+          ...prev,
+          lastMile: footprint,
+        }));
+
         if (map.current.getSource("route")) {
           if (map.current.getLayer("route")) {
             map.current.removeLayer("route");
@@ -508,7 +519,11 @@ export default function MapboxMap({
           type: "geojson",
           data: {
             type: "Feature",
-            properties: {},
+            properties: {
+              distance: footprint.distance,
+              co2Emissions: footprint.co2Emissions,
+              transportType: footprint.transportType,
+            },
             geometry: route.geometry,
           },
         });
@@ -525,6 +540,69 @@ export default function MapboxMap({
             "line-color": "#545775",
             "line-width": 4,
           },
+        });
+
+        map.current.on("mouseenter", "route", (e) => {
+          map.current!.getCanvas().style.cursor = "pointer";
+
+          const coords = e.lngLat;
+          const distance = footprint.distance;
+          const co2Emissions = footprint.co2Emissions;
+          const transportType = footprint.transportType;
+
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          })
+            .setLngLat(coords)
+            .setHTML(
+              `
+              <div style="
+                padding: 16px;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                min-width: 200px;
+              ">
+                <h3 style="
+                  margin: 0 0 8px 0;
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #2c3e50;
+                  line-height: 1.3;
+                ">Distribution → Your Location</h3>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>Distance:</strong> ${distance} km</p>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>CO₂ Emissions:</strong> ${co2Emissions}g per bottle</p>
+                <p style="
+                  margin: 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #545775;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                ">${transportType} transport</p>
+              </div>
+            `
+            )
+            .addTo(map.current!);
+        });
+
+        map.current.on("mouseleave", "route", () => {
+          map.current!.getCanvas().style.cursor = "";
+          document.querySelector(".mapboxgl-popup")?.remove();
         });
 
         setRouteSource(
@@ -562,6 +640,19 @@ export default function MapboxMap({
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0];
 
+        const distance = calculateDistance(
+          manufacturingLocation.lat,
+          manufacturingLocation.lng,
+          distributorLocation.lat,
+          distributorLocation.lng
+        );
+        const footprint = calculateTransportationFootprint(distance, "truck");
+
+        setRouteEmissions((prev) => ({
+          ...prev,
+          manufacturing: footprint,
+        }));
+
         if (map.current.getSource("manufacturing-route")) {
           if (map.current.getLayer("manufacturing-route")) {
             map.current.removeLayer("manufacturing-route");
@@ -573,7 +664,11 @@ export default function MapboxMap({
           type: "geojson",
           data: {
             type: "Feature",
-            properties: {},
+            properties: {
+              distance: footprint.distance,
+              co2Emissions: footprint.co2Emissions,
+              transportType: footprint.transportType,
+            },
             geometry: route.geometry,
           },
         });
@@ -590,6 +685,69 @@ export default function MapboxMap({
             "line-color": "#545775",
             "line-width": 3,
           },
+        });
+
+        map.current.on("mouseenter", "manufacturing-route", (e) => {
+          map.current!.getCanvas().style.cursor = "pointer";
+
+          const coords = e.lngLat;
+          const distance = footprint.distance;
+          const co2Emissions = footprint.co2Emissions;
+          const transportType = footprint.transportType;
+
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          })
+            .setLngLat(coords)
+            .setHTML(
+              `
+              <div style="
+                padding: 16px;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                min-width: 200px;
+              ">
+                <h3 style="
+                  margin: 0 0 8px 0;
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #2c3e50;
+                  line-height: 1.3;
+                ">Manufacturing → Bottling</h3>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>Distance:</strong> ${distance} km</p>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>CO₂ Emissions:</strong> ${co2Emissions}g per bottle</p>
+                <p style="
+                  margin: 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #545775;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                ">${transportType} transport</p>
+              </div>
+            `
+            )
+            .addTo(map.current!);
+        });
+
+        map.current.on("mouseleave", "manufacturing-route", () => {
+          map.current!.getCanvas().style.cursor = "";
+          document.querySelector(".mapboxgl-popup")?.remove();
         });
 
         setManufacturingRouteSource(
@@ -627,6 +785,19 @@ export default function MapboxMap({
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0];
 
+        const distance = calculateDistance(
+          productionLocation.lat,
+          productionLocation.lng,
+          distributorLocation.lat,
+          distributorLocation.lng
+        );
+        const footprint = calculateTransportationFootprint(distance, "truck");
+
+        setRouteEmissions((prev) => ({
+          ...prev,
+          distribution: footprint,
+        }));
+
         if (map.current.getSource("production-route")) {
           if (map.current.getLayer("production-route")) {
             map.current.removeLayer("production-route");
@@ -638,7 +809,11 @@ export default function MapboxMap({
           type: "geojson",
           data: {
             type: "Feature",
-            properties: {},
+            properties: {
+              distance: footprint.distance,
+              co2Emissions: footprint.co2Emissions,
+              transportType: footprint.transportType,
+            },
             geometry: route.geometry,
           },
         });
@@ -657,6 +832,69 @@ export default function MapboxMap({
           },
         });
 
+        map.current.on("mouseenter", "production-route", (e) => {
+          map.current!.getCanvas().style.cursor = "pointer";
+
+          const coords = e.lngLat;
+          const distance = footprint.distance;
+          const co2Emissions = footprint.co2Emissions;
+          const transportType = footprint.transportType;
+
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          })
+            .setLngLat(coords)
+            .setHTML(
+              `
+              <div style="
+                padding: 16px;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                min-width: 200px;
+              ">
+                <h3 style="
+                  margin: 0 0 8px 0;
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #2c3e50;
+                  line-height: 1.3;
+                ">Bottling → Distribution</h3>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>Distance:</strong> ${distance} km</p>
+                <p style="
+                  margin: 0 0 8px 0;
+                  font-size: 14px;
+                  color: #5a6c7d;
+                  line-height: 1.4;
+                "><strong>CO₂ Emissions:</strong> ${co2Emissions}g per bottle</p>
+                <p style="
+                  margin: 0;
+                  font-size: 12px;
+                  font-weight: 500;
+                  color: #545775;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                ">${transportType} transport</p>
+              </div>
+            `
+            )
+            .addTo(map.current!);
+        });
+
+        map.current.on("mouseleave", "production-route", () => {
+          map.current!.getCanvas().style.cursor = "";
+          document.querySelector(".mapboxgl-popup")?.remove();
+        });
+
         setProductionRouteSource(
           map.current.getSource("production-route") as mapboxgl.GeoJSONSource
         );
@@ -669,6 +907,12 @@ export default function MapboxMap({
   useEffect(() => {
     fetchLocations();
   }, []);
+
+  useEffect(() => {
+    if (onEmissionsCalculated) {
+      onEmissionsCalculated(routeEmissions);
+    }
+  }, [routeEmissions, onEmissionsCalculated]);
 
   useEffect(() => {
     if (distributor && map.current) {

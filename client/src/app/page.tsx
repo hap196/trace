@@ -3,6 +3,7 @@
 import { useState } from "react";
 import MapboxMap from "@/components/MapboxMap";
 import TracePanel from "@/components/TracePanel";
+import { type RouteEmissions } from "@/utils/emissionCalculations";
 
 export default function Home() {
   const mapboxAccessToken =
@@ -11,6 +12,11 @@ export default function Home() {
   const [distributor, setDistributor] = useState<any>(null);
   const [showDistributorPopup, setShowDistributorPopup] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [routeEmissions, setRouteEmissions] = useState<RouteEmissions>({
+    lastMile: null,
+    distribution: null,
+    manufacturing: null,
+  });
 
   return (
     <div className="relative w-full h-screen">
@@ -20,11 +26,13 @@ export default function Home() {
         distributor={distributor}
         showDistributorPopup={showDistributorPopup}
         userLocation={userLocation}
+        onEmissionsCalculated={setRouteEmissions}
       />
       <TracePanel 
         onDistributorChange={setDistributor}
         onShowDistributorPopup={setShowDistributorPopup}
         onUserLocationChange={setUserLocation}
+        routeEmissions={routeEmissions}
       />
     </div>
   );
