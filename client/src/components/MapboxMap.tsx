@@ -7,6 +7,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 type MapboxMapProps = {
   accessToken: string;
   styleUrl?: string;
+  distributor?: any;
+  showDistributorPopup?: boolean;
 };
 
 type Location = {
@@ -20,12 +22,21 @@ type Location = {
   };
 };
 
-export default function MapboxMap({ accessToken, styleUrl }: MapboxMapProps) {
+export default function MapboxMap({
+  accessToken,
+  styleUrl,
+  distributor,
+  showDistributorPopup,
+}: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [markers, setMarkers] = useState<mapboxgl.Marker[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [distributorMarker, setDistributorMarker] =
+    useState<mapboxgl.Marker | null>(null);
+  const [distributorPopup, setDistributorPopup] =
+    useState<mapboxgl.Popup | null>(null);
 
   const geocodeAddress = async (address: string) => {
     try {
@@ -47,7 +58,6 @@ export default function MapboxMap({ accessToken, styleUrl }: MapboxMapProps) {
     }
   };
 
-  // Fetch locations from API
   const fetchLocations = async () => {
     try {
       console.log("Fetching locations from API...");
@@ -143,6 +153,47 @@ export default function MapboxMap({ accessToken, styleUrl }: MapboxMapProps) {
     setMarkers(newMarkers);
   };
 
+  const addDistributorMarker = (
+    distributor: any,
+    showPopup: boolean = false
+  ) => {
+    if (!map.current || !distributor || !distributor.coordinates) {
+      return;
+    }
+
+    if (distributorMarker) {
+      distributorMarker.remove();
+    }
+
+    const marker = new mapboxgl.Marker({
+      color: "#545775",
+      scale: 1.2,
+    })
+      .setLngLat([distributor.coordinates.lng, distributor.coordinates.lat])
+      .addTo(map.current);
+
+    const popup = new mapboxgl.Popup({
+      offset: 25,
+      className: "frosted-popup",
+    }).setHTML(`
+      <div class="distributor-popup">
+        <h3>Your Local Distributor</h3>
+        <p>${distributor.bottlerOwner}</p>
+        <p>${distributor.fullAddress || distributor.salesCenter}</p>
+        <p>${distributor.phone}</p>
+        <p>Sales Center</p>
+      </div>
+    `);
+
+    marker.setPopup(popup);
+    if (showPopup) {
+      marker.togglePopup();
+    }
+
+    setDistributorMarker(marker);
+    setDistributorPopup(popup);
+  };
+
   useEffect(() => {
     fetchLocations();
   }, []);
@@ -152,6 +203,18 @@ export default function MapboxMap({ accessToken, styleUrl }: MapboxMapProps) {
       addLocationMarkers();
     }
   }, [locations, accessToken]);
+
+  useEffect(() => {
+    if (distributor && map.current) {
+      addDistributorMarker(distributor, false);
+    }
+  }, [distributor]);
+
+  useEffect(() => {
+    if (showDistributorPopup && distributorMarker) {
+      distributorMarker.togglePopup();
+    }
+  }, [showDistributorPopup, distributorMarker]);
 
   useEffect(() => {
     if (map.current) return;
@@ -193,6 +256,9 @@ export default function MapboxMap({ accessToken, styleUrl }: MapboxMapProps) {
     return () => {
       if (map.current) {
         markers.forEach((marker) => marker.remove());
+        if (distributorMarker) {
+          distributorMarker.remove();
+        }
         map.current.remove();
         map.current = null;
       }

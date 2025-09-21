@@ -14,7 +14,15 @@ type CarbonData = {
   waterUsage: number;
 };
 
-export default function TracePanel() {
+type TracePanelProps = {
+  onDistributorChange?: (distributor: any) => void;
+  onShowDistributorPopup?: (show: boolean) => void;
+};
+
+export default function TracePanel({
+  onDistributorChange,
+  onShowDistributorPopup,
+}: TracePanelProps) {
   const [brand, setBrand] = useState("coca-cola");
   const [drink, setDrink] = useState("water");
   const [location, setLocation] = useState("");
@@ -24,6 +32,8 @@ export default function TracePanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
+  const [distributor, setDistributor] = useState<any>(null);
+  const [distributorLoading, setDistributorLoading] = useState(false);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -97,7 +107,7 @@ export default function TracePanel() {
 
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&types=place`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&types=place,postcode`
       );
 
       if (response.ok) {
@@ -120,9 +130,44 @@ export default function TracePanel() {
     }
   };
 
+  const lookupDistributor = async (zipcode: string) => {
+    setDistributorLoading(true);
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/distributor/${zipcode}`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setDistributor(data.distributor);
+        if (onDistributorChange) {
+          onDistributorChange(data.distributor);
+        }
+      } else {
+        setDistributor(null);
+        if (onDistributorChange) {
+          onDistributorChange(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error looking up distributor:", error);
+      setDistributor(null);
+      if (onDistributorChange) {
+        onDistributorChange(null);
+      }
+    } finally {
+      setDistributorLoading(false);
+    }
+  };
+
   const calculateFootprint = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCalculating(true);
+
+    const zipMatch = location.match(/\b(\d{5})\b/);
+    if (zipMatch) {
+      await lookupDistributor(zipMatch[1]);
+    }
 
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
@@ -143,10 +188,17 @@ export default function TracePanel() {
     setResults(footprint);
     setIsCalculating(false);
     setShowResults(true);
+
+    if (distributor && onShowDistributorPopup) {
+      onShowDistributorPopup(true);
+    }
   };
 
   const goBackToInput = () => {
     setShowResults(false);
+    if (onShowDistributorPopup) {
+      onShowDistributorPopup(false);
+    }
   };
 
   return (
@@ -342,6 +394,31 @@ export default function TracePanel() {
                     </p>
                   </div>
                 </div>
+
+                {distributor && (
+                  <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                    <div className="mb-2">
+                      <h4 className="text-sm font-semibold text-ultra-violet mb-1">
+                        Your Local Distributor
+                      </h4>
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <p className="text-ultra-violet font-medium">
+                        {distributor.bottlerOwner}
+                      </p>
+                      <p className="text-slate-gray">
+                        {distributor.fullAddress || distributor.salesCenter}
+                      </p>
+                      <p className="text-slate-gray">{distributor.phone}</p>
+                      {distributor.geocoded && (
+                        <p className="text-ash-gray text-xs">
+                          📍 {distributor.coordinates.lat.toFixed(4)},{" "}
+                          {distributor.coordinates.lng.toFixed(4)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-4">
                 <button

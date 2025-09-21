@@ -56,3 +56,38 @@ body {
 .frosted-popup .mapboxgl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.85) !important;
 }
+
+.distributor-popup {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+}
+
+.distributor-popup h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.3;
+}
+
+.distributor-popup p {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #5a6c7d;
+  line-height: 1.4;
+}
+
+.distributor-popup p:last-child {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #545775;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

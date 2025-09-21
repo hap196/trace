@@ -123,6 +123,121 @@ app.get("/api/locations", async (req, res) => {
   }
 });
 
+app.get("/api/distributor/:zipcode", async (req, res) => {
+  try {
+    const { zipcode } = req.params;
+
+    const quickbaseUrl = `https://cokecbs.quickbase.com/db/bj9gkzaia?act=API_GenResultsTable&apptoken=b65pay3cy963xcds84ppfnynrmd&query={%276%27.SW.%27${zipcode}%27}&clist=6.287.288.35.36&slist=6&options=sortorder-A.ned.nvw.nfg.&jsa=1`;
+
+    const response = await fetch(quickbaseUrl, {
+      headers: {
+        Accept: "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        Referer: "https://www.cokesolutions.com/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `QuickBase API responded with status: ${response.status}`
+      );
+    }
+
+    const data = await response.text();
+
+    try {
+      const headingMatch = data.match(/qdb_heading\[(\d+)\] = "([^"]+)";/g);
+      const headings = [];
+      if (headingMatch) {
+        headingMatch.forEach((match) => {
+          const valueMatch = match.match(/qdb_heading\[\d+\] = "([^"]+)";/);
+          if (valueMatch) headings.push(valueMatch[1]);
+        });
+      }
+
+      const dataMatches = data.match(/qdb_data\[0\]\[(\d+)\] = "([^"]+)";/g);
+      const rowData = [];
+      if (dataMatches) {
+        dataMatches.forEach((match) => {
+          const valueMatch = match.match(/qdb_data\[0\]\[\d+\] = "([^"]+)";/);
+          if (valueMatch) rowData.push(valueMatch[1]);
+        });
+      }
+
+      if (headings.length > 0 && rowData.length > 0) {
+        const distributor = {};
+        headings.forEach((heading, index) => {
+          distributor[heading] = rowData[index] || "";
+        });
+
+        const distributorInfo = {
+          zipCode: distributor.ZipCode,
+          bottlerOwner: distributor["pri Bottler Owner"],
+          marketUnit: distributor["pri Market Unit"],
+          salesCenter: distributor["pri Sales Center"],
+          phone: distributor["pri Service"],
+        };
+
+        try {
+          const salesCenterLocation = distributorInfo.salesCenter;
+          const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            salesCenterLocation
+          )}.json?access_token=${
+            process.env.MAPBOX_ACCESS_TOKEN
+          }&types=place&limit=1`;
+
+          const geocodeResponse = await fetch(geocodeUrl);
+          if (geocodeResponse.ok) {
+            const geocodeData = await geocodeResponse.json();
+            if (geocodeData.features && geocodeData.features.length > 0) {
+              const feature = geocodeData.features[0];
+              distributorInfo.fullAddress = feature.place_name;
+              distributorInfo.coordinates = {
+                lng: feature.center[0],
+                lat: feature.center[1],
+              };
+              distributorInfo.geocoded = true;
+            } else {
+              distributorInfo.geocoded = false;
+            }
+          }
+        } catch (geocodeError) {
+          console.log("Geocoding failed:", geocodeError.message);
+          distributorInfo.geocoded = false;
+        }
+
+        res.json({
+          success: true,
+          zipcode: zipcode,
+          distributor: distributorInfo,
+        });
+      } else {
+        res.json({
+          success: false,
+          message: "No distributor found for this zip code",
+          zipcode: zipcode,
+        });
+      }
+    } catch (parseError) {
+      res.json({
+        success: false,
+        message: "Failed to parse distributor response",
+        error: parseError.message,
+        rawData: data.substring(0, 500),
+      });
+    }
+  } catch (error) {
+    console.error("Distributor lookup error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to lookup distributor",
+      message: error.message,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
