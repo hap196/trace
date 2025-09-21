@@ -37,8 +37,7 @@ export default function TracePanel({
   routeEmissions,
   waterSources,
 }: TracePanelProps) {
-  const [brand, setBrand] = useState("coca-cola");
-  const [drink, setDrink] = useState("water");
+  const [brand, setBrand] = useState("dasani");
   const [location, setLocation] = useState("");
   const [results, setResults] = useState<CarbonData | null>(null);
   const [totalEmissions, setTotalEmissions] = useState<TotalEmissions | null>(
@@ -51,6 +50,7 @@ export default function TracePanel({
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [distributor, setDistributor] = useState<any>(null);
   const [distributorLoading, setDistributorLoading] = useState(false);
+  const [isManualLocation, setIsManualLocation] = useState(false);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -117,8 +117,17 @@ export default function TracePanel({
     }
   };
 
+  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocation(e.target.value);
+    setIsManualLocation(true);
+    if (onUserLocationChange) {
+      onUserLocationChange(null);
+    }
+  };
+
   const getCurrentLocation = async () => {
     setIsLocationLoading(true);
+    setIsManualLocation(false);
 
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by this browser.");
@@ -139,6 +148,7 @@ export default function TracePanel({
 
       const { latitude, longitude } = position.coords;
 
+      // Update the user location for the map
       if (onUserLocationChange) {
         onUserLocationChange({ lat: latitude, lng: longitude });
       }
@@ -202,6 +212,30 @@ export default function TracePanel({
     e.preventDefault();
     setIsCalculating(true);
 
+    if (isManualLocation && location.trim()) {
+      try {
+        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            location
+          )}.json?access_token=${mapboxToken}&limit=1`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            const feature = data.features[0];
+            const [lng, lat] = feature.center;
+            if (onUserLocationChange) {
+              onUserLocationChange({ lat, lng });
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error geocoding manual location:", error);
+      }
+    }
+
     const zipMatch = location.match(/\b(\d{5})\b/);
     if (zipMatch) {
       await lookupDistributor(zipMatch[1]);
@@ -210,14 +244,12 @@ export default function TracePanel({
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     const baseFootprint = {
-      "coca-cola": {
-        water: { co2: 0.33, microplastics: 5.2, waterUsage: 1.9 },
-        coke: { co2: 0.42, microplastics: 5.2, waterUsage: 2.5 },
-      },
+      dasani: { co2: 0.33, microplastics: 5.2, waterUsage: 1.9 },
+      smartwater: { co2: 0.35, microplastics: 4.8, waterUsage: 2.1 },
+      aquafina: { co2: 0.31, microplastics: 5.0, waterUsage: 1.8 },
     };
 
-    const brandData = baseFootprint[brand as keyof typeof baseFootprint];
-    const footprint = brandData?.[drink as keyof typeof brandData] || {
+    const footprint = baseFootprint[brand as keyof typeof baseFootprint] || {
       co2: 0.35,
       microplastics: 5.0,
       waterUsage: 2.0,
@@ -279,50 +311,32 @@ export default function TracePanel({
           </div>
 
           <form onSubmit={calculateFootprint} className="space-y-5 flex-1">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  htmlFor="brand"
-                  className="block text-sm font-semibold text-ultra-violet mb-3"
+            <div>
+              <label
+                htmlFor="brand"
+                className="block text-sm font-semibold text-ultra-violet mb-3"
+              >
+                water brand
+              </label>
+              <select
+                id="brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet font-medium shadow-sm transition-all"
+              >
+                <option value="dasani" className="text-ultra-violet bg-white">
+                  dasani
+                </option>
+                <option
+                  value="smartwater"
+                  className="text-ultra-violet bg-white"
                 >
-                  bottle brand
-                </label>
-                <select
-                  id="brand"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet font-medium shadow-sm transition-all"
-                >
-                  <option
-                    value="coca-cola"
-                    className="text-ultra-violet bg-white"
-                  >
-                    coca-cola
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="drink"
-                  className="block text-sm font-semibold text-ultra-violet mb-3"
-                >
-                  drink type
-                </label>
-                <select
-                  id="drink"
-                  value={drink}
-                  onChange={(e) => setDrink(e.target.value)}
-                  className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet font-medium shadow-sm transition-all"
-                >
-                  <option value="water" className="text-ultra-violet bg-white">
-                    water
-                  </option>
-                  <option value="coke" className="text-ultra-violet bg-white">
-                    coke
-                  </option>
-                </select>
-              </div>
+                  smartwater
+                </option>
+                <option value="aquafina" className="text-ultra-violet bg-white">
+                  aquafina
+                </option>
+              </select>
             </div>
             <div>
               <label
@@ -336,20 +350,19 @@ export default function TracePanel({
                   id="location"
                   type="text"
                   value={location}
-                  readOnly
-                  onClick={getCurrentLocation}
+                  onChange={handleLocationChange}
                   placeholder={
                     isLocationLoading
                       ? "Getting location..."
-                      : "Click here to enable location"
+                      : "Enter address or click location button"
                   }
-                  className="w-full p-3 pr-12 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet placeholder-slate-gray font-medium shadow-sm transition-all cursor-pointer hover:bg-white/40"
+                  className="w-full p-3 pr-12 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet placeholder-slate-gray font-medium shadow-sm transition-all"
                 />
                 <button
                   type="button"
                   onClick={getCurrentLocation}
                   disabled={isLocationLoading}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-lg hover:bg-white/20 transition-all duration-200 disabled:opacity-50 pointer-events-none"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-lg hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
                   title="Get current location"
                 >
                   {isLocationLoading ? (
