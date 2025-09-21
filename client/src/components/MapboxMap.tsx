@@ -9,6 +9,7 @@ type MapboxMapProps = {
   styleUrl?: string;
   distributor?: any;
   showDistributorPopup?: boolean;
+  userLocation?: { lat: number; lng: number } | null;
 };
 
 type Location = {
@@ -27,6 +28,7 @@ export default function MapboxMap({
   styleUrl,
   distributor,
   showDistributorPopup,
+  userLocation,
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -37,6 +39,12 @@ export default function MapboxMap({
     useState<mapboxgl.Marker | null>(null);
   const [distributorPopup, setDistributorPopup] =
     useState<mapboxgl.Popup | null>(null);
+  const [userMarker, setUserMarker] = useState<mapboxgl.Marker | null>(null);
+  const [routeSource, setRouteSource] = useState<mapboxgl.GeoJSONSource | null>(
+    null
+  );
+  const currentUserLocation = useRef<{ lat: number; lng: number } | null>(null);
+  const currentDistributor = useRef<any>(null);
 
   const geocodeAddress = async (address: string) => {
     try {
@@ -188,10 +196,99 @@ export default function MapboxMap({
     marker.setPopup(popup);
     if (showPopup) {
       marker.togglePopup();
+      if (currentUserLocation.current) {
+        setTimeout(() => {
+          addDrivingRoute(
+            currentUserLocation.current!,
+            distributor.coordinates
+          );
+        }, 1000);
+      }
     }
 
     setDistributorMarker(marker);
     setDistributorPopup(popup);
+  };
+
+  const addUserLocationMarker = (location: { lat: number; lng: number }) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (userMarker) {
+      userMarker.remove();
+    }
+
+    const marker = new mapboxgl.Marker({
+      color: "#90B494",
+      scale: 1.0,
+    })
+      .setLngLat([location.lng, location.lat])
+      .addTo(map.current);
+
+    setUserMarker(marker);
+  };
+
+  const addDrivingRoute = async (
+    userLocation: { lat: number; lng: number },
+    distributorLocation: { lat: number; lng: number }
+  ) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (!map.current.isStyleLoaded()) {
+      setTimeout(() => addDrivingRoute(userLocation, distributorLocation), 500);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.lng},${userLocation.lat};${distributorLocation.lng},${distributorLocation.lat}?geometries=geojson&access_token=${accessToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+
+        if (map.current.getSource("route")) {
+          if (map.current.getLayer("route")) {
+            map.current.removeLayer("route");
+          }
+          map.current.removeSource("route");
+        }
+
+        map.current.addSource("route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: route.geometry,
+          },
+        });
+
+        map.current.addLayer({
+          id: "route",
+          type: "line",
+          source: "route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#545775",
+            "line-width": 4,
+          },
+        });
+
+        setRouteSource(
+          map.current.getSource("route") as mapboxgl.GeoJSONSource
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching driving route:", error);
+    }
   };
 
   useEffect(() => {
@@ -206,15 +303,27 @@ export default function MapboxMap({
 
   useEffect(() => {
     if (distributor && map.current) {
+      currentDistributor.current = distributor;
       addDistributorMarker(distributor, false);
     }
   }, [distributor]);
 
   useEffect(() => {
-    if (showDistributorPopup && distributorMarker) {
-      distributorMarker.togglePopup();
+    if (
+      showDistributorPopup &&
+      currentDistributor.current &&
+      currentDistributor.current.coordinates
+    ) {
+      addDistributorMarker(currentDistributor.current, true);
     }
-  }, [showDistributorPopup, distributorMarker]);
+  }, [showDistributorPopup]);
+
+  useEffect(() => {
+    if (userLocation && map.current) {
+      currentUserLocation.current = userLocation;
+      addUserLocationMarker(userLocation);
+    }
+  }, [userLocation]);
 
   useEffect(() => {
     if (map.current) return;
@@ -236,10 +345,6 @@ export default function MapboxMap({
         });
 
         map.current.on("load", () => {
-          console.log(
-            "Map loaded successfully, locations available:",
-            locations.length
-          );
           if (locations.length > 0) {
             addLocationMarkers();
           }
@@ -258,6 +363,13 @@ export default function MapboxMap({
         markers.forEach((marker) => marker.remove());
         if (distributorMarker) {
           distributorMarker.remove();
+        }
+        if (userMarker) {
+          userMarker.remove();
+        }
+        if (map.current.getSource("route")) {
+          map.current.removeLayer("route");
+          map.current.removeSource("route");
         }
         map.current.remove();
         map.current = null;

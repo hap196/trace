@@ -10,6 +10,7 @@ export default function Home() {
   const mapboxStyleUrl = process.env.NEXT_PUBLIC_MAPBOX_STYLE_URL;
   const [distributor, setDistributor] = useState<any>(null);
   const [showDistributorPopup, setShowDistributorPopup] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   return (
     <div className="relative w-full h-screen">
@@ -18,10 +19,12 @@ export default function Home() {
         styleUrl={mapboxStyleUrl} 
         distributor={distributor}
         showDistributorPopup={showDistributorPopup}
+        userLocation={userLocation}
       />
       <TracePanel 
         onDistributorChange={setDistributor}
         onShowDistributorPopup={setShowDistributorPopup}
+        onUserLocationChange={setUserLocation}
       />
     </div>
   );

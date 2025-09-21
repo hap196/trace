@@ -17,11 +17,15 @@ type CarbonData = {
 type TracePanelProps = {
   onDistributorChange?: (distributor: any) => void;
   onShowDistributorPopup?: (show: boolean) => void;
+  onUserLocationChange?: (
+    location: { lat: number; lng: number } | null
+  ) => void;
 };
 
 export default function TracePanel({
   onDistributorChange,
   onShowDistributorPopup,
+  onUserLocationChange,
 }: TracePanelProps) {
   const [brand, setBrand] = useState("coca-cola");
   const [drink, setDrink] = useState("water");
@@ -104,6 +108,10 @@ export default function TracePanel({
       );
 
       const { latitude, longitude } = position.coords;
+
+      if (onUserLocationChange) {
+        onUserLocationChange({ lat: latitude, lng: longitude });
+      }
 
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
       const response = await fetch(
@@ -189,9 +197,11 @@ export default function TracePanel({
     setIsCalculating(false);
     setShowResults(true);
 
-    if (distributor && onShowDistributorPopup) {
-      onShowDistributorPopup(true);
-    }
+    setTimeout(() => {
+      if (onShowDistributorPopup) {
+        onShowDistributorPopup(true);
+      }
+    }, 500);
   };
 
   const goBackToInput = () => {
@@ -412,7 +422,7 @@ export default function TracePanel({
                       <p className="text-slate-gray">{distributor.phone}</p>
                       {distributor.geocoded && (
                         <p className="text-ash-gray text-xs">
-                          📍 {distributor.coordinates.lat.toFixed(4)},{" "}
+                          {distributor.coordinates.lat.toFixed(4)},{" "}
                           {distributor.coordinates.lng.toFixed(4)}
                         </p>
                       )}
