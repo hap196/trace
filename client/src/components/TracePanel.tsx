@@ -24,17 +24,16 @@ export default function TracePanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check authentication status on component mount and window focus
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/health', {
-          credentials: 'include'
+        const response = await fetch("http://localhost:3001/api/auth-status", {
+          credentials: "include",
         });
         const data = await response.json();
         setIsAuthenticated(data.authenticated || false);
       } catch (error) {
-        console.error('Failed to check auth status:', error);
+        console.error("Failed to check auth status:", error);
         setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
@@ -43,38 +42,34 @@ export default function TracePanel() {
 
     checkAuthStatus();
 
-    // Check auth status when window gets focus (after redirect from Auth0)
     const handleFocus = () => {
       checkAuthStatus();
     };
 
-    // Also check when the page becomes visible again
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         checkAuthStatus();
       }
     };
 
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     // Check for auth changes every 2 seconds when component is mounted
     const interval = setInterval(checkAuthStatus, 2000);
 
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
     };
   }, []);
 
   const handleAuth = () => {
     if (isAuthenticated) {
-      // Logout
-      window.location.href = 'http://localhost:3001/logout';
+      window.location.href = "http://localhost:3001/logout";
     } else {
-      // Login
-      window.location.href = 'http://localhost:3001/login';
+      window.location.href = "http://localhost:3001/login";
     }
   };
 
