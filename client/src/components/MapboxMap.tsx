@@ -235,10 +235,10 @@ export default function MapboxMap({
                     letter-spacing: 0.5px;
                   ">${
                     location.type === "sales"
-                      ? "Sales Center"
+                      ? "Distribution Center"
                       : location.type === "production"
-                      ? "Production Center"
-                      : "Manufacturing Center"
+                      ? "Bottling Center"
+                      : "Bottle Manufacturing Center"
                   }</p>
                 </div>
               `)
@@ -280,7 +280,7 @@ export default function MapboxMap({
         <p>${distributor.bottlerOwner}</p>
         <p>${distributor.fullAddress || distributor.salesCenter}</p>
         <p>${distributor.phone}</p>
-        <p>Sales Center</p>
+        <p>Distribution Center</p>
       </div>
     `);
 
@@ -401,7 +401,7 @@ export default function MapboxMap({
           color: #90B494;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-        ">Production Center</p>
+        ">Bottling Center</p>
       </div>
     `);
 
@@ -466,7 +466,7 @@ export default function MapboxMap({
           color: #DBCFB0;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-        ">Manufacturing Center</p>
+        ">Bottle Manufacturing Center</p>
       </div>
     `);
 
