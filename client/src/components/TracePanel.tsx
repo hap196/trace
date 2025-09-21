@@ -11,6 +11,7 @@ import {
   calculateTotalEmissions,
   type RouteEmissions,
   type TotalEmissions,
+  type WaterSources,
 } from "@/utils/emissionCalculations";
 
 type CarbonData = {
@@ -26,6 +27,7 @@ type TracePanelProps = {
     location: { lat: number; lng: number } | null
   ) => void;
   routeEmissions?: RouteEmissions;
+  waterSources?: WaterSources | null;
 };
 
 export default function TracePanel({
@@ -33,6 +35,7 @@ export default function TracePanel({
   onShowDistributorPopup,
   onUserLocationChange,
   routeEmissions,
+  waterSources,
 }: TracePanelProps) {
   const [brand, setBrand] = useState("coca-cola");
   const [drink, setDrink] = useState("water");
@@ -94,7 +97,9 @@ export default function TracePanel({
       const hasRouteData =
         routeEmissions.lastMile ||
         routeEmissions.distribution ||
-        routeEmissions.manufacturing;
+        routeEmissions.manufacturing ||
+        routeEmissions.waterSource ||
+        routeEmissions.waterTreatment;
 
       if (hasRouteData) {
         const total = calculateTotalEmissions(results, routeEmissions);
@@ -450,6 +455,30 @@ export default function TracePanel({
                         </div>
                       )}
 
+                      {routeEmissions?.waterSource && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-gray">
+                            Water source ({routeEmissions.waterSource.distance}{" "}
+                            km):
+                          </span>
+                          <span className="text-ultra-violet font-medium">
+                            {routeEmissions.waterSource.co2Emissions} kg
+                          </span>
+                        </div>
+                      )}
+
+                      {routeEmissions?.waterTreatment && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-gray">
+                            Water treatment (
+                            {routeEmissions.waterTreatment.distance} km):
+                          </span>
+                          <span className="text-ultra-violet font-medium">
+                            {routeEmissions.waterTreatment.co2Emissions} kg
+                          </span>
+                        </div>
+                      )}
+
                       <div className="border-t border-white/30 pt-2 flex justify-between items-center">
                         <span className="text-ultra-violet font-semibold">
                           Total CO₂:
@@ -458,6 +487,51 @@ export default function TracePanel({
                           {totalEmissions.total.co2} kg
                         </span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {waterSources && (
+                  <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+                    <div className="mb-2">
+                      <h4 className="text-sm font-semibold text-ultra-violet mb-1">
+                        Water Sources
+                      </h4>
+                    </div>
+                    <div className="space-y-3 text-xs">
+                      {waterSources.municipalWaterSource && (
+                        <div>
+                          <h5 className="text-xs font-medium text-ultra-violet mb-1">
+                            Municipal Water Source
+                          </h5>
+                          <p className="text-slate-gray mb-1">
+                            {waterSources.municipalWaterSource.name}
+                          </p>
+                          <p className="text-ash-gray text-xs">
+                            {waterSources.municipalWaterSource.address}
+                          </p>
+                          <p className="text-cambridge-blue text-xs font-medium">
+                            {waterSources.municipalWaterSource.distance}
+                          </p>
+                        </div>
+                      )}
+
+                      {waterSources.waterTreatmentCenter && (
+                        <div>
+                          <h5 className="text-xs font-medium text-ultra-violet mb-1">
+                            Water Treatment Center
+                          </h5>
+                          <p className="text-slate-gray mb-1">
+                            {waterSources.waterTreatmentCenter.name}
+                          </p>
+                          <p className="text-ash-gray text-xs">
+                            {waterSources.waterTreatmentCenter.address}
+                          </p>
+                          <p className="text-cambridge-blue text-xs font-medium">
+                            {waterSources.waterTreatmentCenter.distance}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

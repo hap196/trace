@@ -8,6 +8,7 @@ import {
   calculateTransportationFootprint,
   type RouteEmissions,
   type TransportFootprint,
+  type WaterSources,
 } from "@/utils/emissionCalculations";
 
 type MapboxMapProps = {
@@ -17,6 +18,7 @@ type MapboxMapProps = {
   showDistributorPopup?: boolean;
   userLocation?: { lat: number; lng: number } | null;
   onEmissionsCalculated?: (emissions: RouteEmissions) => void;
+  onWaterSourcesFound?: (waterSources: WaterSources) => void;
 };
 
 type Location = {
@@ -37,6 +39,7 @@ export default function MapboxMap({
   showDistributorPopup,
   userLocation,
   onEmissionsCalculated,
+  onWaterSourcesFound,
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -59,6 +62,10 @@ export default function MapboxMap({
     useState<mapboxgl.GeoJSONSource | null>(null);
   const [manufacturingRouteSource, setManufacturingRouteSource] =
     useState<mapboxgl.GeoJSONSource | null>(null);
+  const [waterSourceRouteSource, setWaterSourceRouteSource] =
+    useState<mapboxgl.GeoJSONSource | null>(null);
+  const [waterTreatmentRouteSource, setWaterTreatmentRouteSource] =
+    useState<mapboxgl.GeoJSONSource | null>(null);
   const currentUserLocation = useRef<{ lat: number; lng: number } | null>(null);
   const currentDistributor = useRef<any>(null);
   const currentProductionCenter = useRef<Location | null>(null);
@@ -67,7 +74,13 @@ export default function MapboxMap({
     lastMile: null,
     distribution: null,
     manufacturing: null,
+    waterSource: null,
+    waterTreatment: null,
   });
+  const [waterSources, setWaterSources] = useState<WaterSources | null>(null);
+  const [waterSourceMarkers, setWaterSourceMarkers] = useState<
+    mapboxgl.Marker[]
+  >([]);
 
   const geocodeAddress = async (address: string) => {
     try {
@@ -111,6 +124,388 @@ export default function MapboxMap({
     if (type === "sales") return "#718F94";
     if (type === "production") return "#90B494";
     return "#DBCFB0";
+  };
+
+  const lookupWaterSources = async (
+    productionCenter: Location & { coordinates: { lat: number; lng: number } }
+  ) => {
+    try {
+      const locationQuery = `${productionCenter.coordinates.lat},${productionCenter.coordinates.lng}`;
+      const response = await fetch(
+        `http://localhost:3001/api/water-sources/${encodeURIComponent(
+          locationQuery
+        )}`
+      );
+      const data = await response.json();
+
+      if (data.success && data.waterSources) {
+        setWaterSources(data.waterSources);
+        if (onWaterSourcesFound) {
+          onWaterSourcesFound(data.waterSources);
+        }
+        addWaterSourceMarkers(data.waterSources);
+
+        setTimeout(() => {
+          addWaterTransportRoutes(data.waterSources, productionCenter);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error looking up water sources:", error);
+    }
+  };
+
+  const addWaterSourceMarkers = (waterSources: WaterSources) => {
+    if (!map.current) return;
+
+    waterSourceMarkers.forEach((marker) => marker.remove());
+    const newMarkers: mapboxgl.Marker[] = [];
+
+    if (waterSources.municipalWaterSource) {
+      const marker = new mapboxgl.Marker({
+        color: "#90B494",
+        scale: 1.0,
+      })
+        .setLngLat([
+          waterSources.municipalWaterSource.coordinates.lng,
+          waterSources.municipalWaterSource.coordinates.lat,
+        ])
+        .setPopup(
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          }).setHTML(`
+            <div style="
+              padding: 16px;
+              background: rgba(255, 255, 255, 0.85);
+              backdrop-filter: blur(12px);
+              border-radius: 12px;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+              min-width: 200px;
+            ">
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
+                ${waterSources.municipalWaterSource.name}
+              </h3>
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                ${waterSources.municipalWaterSource.address}
+              </p>
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #90B494; font-weight: 500;">
+                Municipal Water Source • ${waterSources.municipalWaterSource.distance}
+              </p>
+            </div>
+          `)
+        )
+        .addTo(map.current);
+      newMarkers.push(marker);
+    }
+    if (waterSources.waterTreatmentCenter) {
+      const marker = new mapboxgl.Marker({
+        color: "#BFC8AD",
+        scale: 1.0,
+      })
+        .setLngLat([
+          waterSources.waterTreatmentCenter.coordinates.lng,
+          waterSources.waterTreatmentCenter.coordinates.lat,
+        ])
+        .setPopup(
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          }).setHTML(`
+            <div style="
+              padding: 16px;
+              background: rgba(255, 255, 255, 0.85);
+              backdrop-filter: blur(12px);
+              border-radius: 12px;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+              min-width: 200px;
+            ">
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
+                ${waterSources.waterTreatmentCenter.name}
+              </h3>
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                ${waterSources.waterTreatmentCenter.address}
+              </p>
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #BFC8AD; font-weight: 500;">
+                Water Treatment Center • ${waterSources.waterTreatmentCenter.distance}
+              </p>
+            </div>
+          `)
+        )
+        .addTo(map.current);
+      newMarkers.push(marker);
+    }
+
+    setWaterSourceMarkers(newMarkers);
+  };
+
+  const addWaterTransportRoutes = async (
+    waterSources: WaterSources,
+    productionCenter: Location & { coordinates: { lat: number; lng: number } }
+  ) => {
+    if (!map.current) return;
+
+    if (
+      waterSources.municipalWaterSource &&
+      waterSources.waterTreatmentCenter
+    ) {
+      await addWaterSourceRoute(
+        waterSources.municipalWaterSource.coordinates,
+        waterSources.waterTreatmentCenter.coordinates
+      );
+    }
+
+    if (waterSources.waterTreatmentCenter) {
+      await addWaterTreatmentRoute(
+        waterSources.waterTreatmentCenter.coordinates,
+        productionCenter.coordinates
+      );
+    }
+  };
+
+  const addWaterSourceRoute = async (
+    waterSourceLocation: { lat: number; lng: number },
+    treatmentLocation: { lat: number; lng: number }
+  ) => {
+    if (!map.current) return;
+
+    if (!map.current.isStyleLoaded()) {
+      setTimeout(
+        () => addWaterSourceRoute(waterSourceLocation, treatmentLocation),
+        500
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${waterSourceLocation.lng},${waterSourceLocation.lat};${treatmentLocation.lng},${treatmentLocation.lat}?geometries=geojson&access_token=${accessToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distance = calculateDistance(
+          waterSourceLocation.lat,
+          waterSourceLocation.lng,
+          treatmentLocation.lat,
+          treatmentLocation.lng
+        );
+        const footprint = calculateTransportationFootprint(distance, "truck");
+
+        setRouteEmissions((prev) => ({
+          ...prev,
+          waterSource: footprint,
+        }));
+
+        if (map.current.getSource("water-source-route")) {
+          if (map.current.getLayer("water-source-route")) {
+            map.current.removeLayer("water-source-route");
+          }
+          map.current.removeSource("water-source-route");
+        }
+
+        map.current.addSource("water-source-route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {
+              distance: footprint.distance,
+              co2Emissions: footprint.co2Emissions,
+              transportType: footprint.transportType,
+            },
+            geometry: route.geometry,
+          },
+        });
+
+        map.current.addLayer({
+          id: "water-source-route",
+          type: "line",
+          source: "water-source-route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#545775",
+            "line-width": 3,
+          },
+        });
+
+        map.current.on("mouseenter", "water-source-route", (e) => {
+          map.current!.getCanvas().style.cursor = "pointer";
+          const coords = e.lngLat;
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          })
+            .setLngLat(coords)
+            .setHTML(
+              `
+              <div style="
+                padding: 16px;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(12px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                min-width: 200px;
+              ">
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
+                  Water Source → Treatment
+                </h3>
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                  <strong>Distance:</strong> ${footprint.distance} km
+                </p>
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                  <strong>CO₂ Emissions:</strong> ${footprint.co2Emissions}kg per bottle
+                </p>
+                <p style="margin: 0; font-size: 12px; font-weight: 500; color: #545775; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ${footprint.transportType} transport
+                </p>
+              </div>
+            `
+            )
+            .addTo(map.current!);
+        });
+
+        map.current.on("mouseleave", "water-source-route", () => {
+          map.current!.getCanvas().style.cursor = "";
+          document.querySelector(".mapboxgl-popup")?.remove();
+        });
+
+        setWaterSourceRouteSource(
+          map.current.getSource("water-source-route") as mapboxgl.GeoJSONSource
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching water source route:", error);
+    }
+  };
+
+  const addWaterTreatmentRoute = async (
+    treatmentLocation: { lat: number; lng: number },
+    productionLocation: { lat: number; lng: number }
+  ) => {
+    if (!map.current) return;
+
+    if (!map.current.isStyleLoaded()) {
+      setTimeout(
+        () => addWaterTreatmentRoute(treatmentLocation, productionLocation),
+        500
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${treatmentLocation.lng},${treatmentLocation.lat};${productionLocation.lng},${productionLocation.lat}?geometries=geojson&access_token=${accessToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distance = calculateDistance(
+          treatmentLocation.lat,
+          treatmentLocation.lng,
+          productionLocation.lat,
+          productionLocation.lng
+        );
+        const footprint = calculateTransportationFootprint(distance, "truck");
+
+        setRouteEmissions((prev) => ({
+          ...prev,
+          waterTreatment: footprint,
+        }));
+
+        if (map.current.getSource("water-treatment-route")) {
+          if (map.current.getLayer("water-treatment-route")) {
+            map.current.removeLayer("water-treatment-route");
+          }
+          map.current.removeSource("water-treatment-route");
+        }
+
+        map.current.addSource("water-treatment-route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {
+              distance: footprint.distance,
+              co2Emissions: footprint.co2Emissions,
+              transportType: footprint.transportType,
+            },
+            geometry: route.geometry,
+          },
+        });
+
+        map.current.addLayer({
+          id: "water-treatment-route",
+          type: "line",
+          source: "water-treatment-route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#545775", // ultra-violet
+            "line-width": 3,
+          },
+        });
+
+        map.current.on("mouseenter", "water-treatment-route", (e) => {
+          map.current!.getCanvas().style.cursor = "pointer";
+          const coords = e.lngLat;
+          new mapboxgl.Popup({
+            offset: 25,
+            className: "frosted-popup",
+          })
+            .setLngLat(coords)
+            .setHTML(
+              `
+              <div style="
+                padding: 16px;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(12px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                min-width: 200px;
+              ">
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #2c3e50;">
+                  Treatment → Bottling
+                </h3>
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                  <strong>Distance:</strong> ${footprint.distance} km
+                </p>
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #5a6c7d;">
+                  <strong>CO₂ Emissions:</strong> ${footprint.co2Emissions}kg per bottle
+                </p>
+                <p style="margin: 0; font-size: 12px; font-weight: 500; color: #545775; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ${footprint.transportType} transport
+                </p>
+              </div>
+            `
+            )
+            .addTo(map.current!);
+        });
+
+        map.current.on("mouseleave", "water-treatment-route", () => {
+          map.current!.getCanvas().style.cursor = "";
+          document.querySelector(".mapboxgl-popup")?.remove();
+        });
+
+        setWaterTreatmentRouteSource(
+          map.current.getSource(
+            "water-treatment-route"
+          ) as mapboxgl.GeoJSONSource
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching water treatment route:", error);
+    }
   };
 
   const findClosestProductionCenter = async (distributorLocation: {
@@ -301,6 +696,8 @@ export default function MapboxMap({
             closestProduction.coordinates,
             distributor.coordinates
           );
+
+          lookupWaterSources(closestProduction);
 
           const closestManufacturing = await findClosestManufacturingCenter(
             closestProduction.coordinates
@@ -982,6 +1379,7 @@ export default function MapboxMap({
         if (manufacturingMarker) {
           manufacturingMarker.remove();
         }
+        waterSourceMarkers.forEach((marker) => marker.remove());
         if (map.current.getSource("route")) {
           map.current.removeLayer("route");
           map.current.removeSource("route");
@@ -993,6 +1391,14 @@ export default function MapboxMap({
         if (map.current.getSource("manufacturing-route")) {
           map.current.removeLayer("manufacturing-route");
           map.current.removeSource("manufacturing-route");
+        }
+        if (map.current.getSource("water-source-route")) {
+          map.current.removeLayer("water-source-route");
+          map.current.removeSource("water-source-route");
+        }
+        if (map.current.getSource("water-treatment-route")) {
+          map.current.removeLayer("water-treatment-route");
+          map.current.removeSource("water-treatment-route");
         }
         map.current.remove();
         map.current = null;

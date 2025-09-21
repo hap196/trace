@@ -6,10 +6,24 @@ export type TransportFootprint = {
   transportType: TransportType;
 };
 
+export type WaterSource = {
+  name: string;
+  address: string;
+  distance: string;
+  coordinates: { lat: number; lng: number };
+};
+
+export type WaterSources = {
+  municipalWaterSource: WaterSource;
+  waterTreatmentCenter: WaterSource;
+};
+
 export type RouteEmissions = {
   lastMile: TransportFootprint | null;
   distribution: TransportFootprint | null;
   manufacturing: TransportFootprint | null;
+  waterSource: TransportFootprint | null;
+  waterTreatment: TransportFootprint | null;
 };
 
 export type TotalEmissions = {
@@ -93,6 +107,16 @@ export const calculateTotalEmissions = (
   if (routeEmissions.manufacturing) {
     totalTransportationCO2 += routeEmissions.manufacturing.co2Emissions;
     totalDistance += routeEmissions.manufacturing.distance;
+  }
+
+  if (routeEmissions.waterSource) {
+    totalTransportationCO2 += routeEmissions.waterSource.co2Emissions;
+    totalDistance += routeEmissions.waterSource.distance;
+  }
+
+  if (routeEmissions.waterTreatment) {
+    totalTransportationCO2 += routeEmissions.waterTreatment.co2Emissions;
+    totalDistance += routeEmissions.waterTreatment.distance;
   }
 
   const totalCO2 = baseProductFootprint.co2 + totalTransportationCO2;

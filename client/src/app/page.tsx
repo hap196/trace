@@ -3,7 +3,7 @@
 import { useState } from "react";
 import MapboxMap from "@/components/MapboxMap";
 import TracePanel from "@/components/TracePanel";
-import { type RouteEmissions } from "@/utils/emissionCalculations";
+import { type RouteEmissions, type WaterSources } from "@/utils/emissionCalculations";
 
 export default function Home() {
   const mapboxAccessToken =
@@ -16,7 +16,10 @@ export default function Home() {
     lastMile: null,
     distribution: null,
     manufacturing: null,
+    waterSource: null,
+    waterTreatment: null,
   });
+  const [waterSources, setWaterSources] = useState<WaterSources | null>(null);
 
   return (
     <div className="relative w-full h-screen">
@@ -27,12 +30,14 @@ export default function Home() {
         showDistributorPopup={showDistributorPopup}
         userLocation={userLocation}
         onEmissionsCalculated={setRouteEmissions}
+        onWaterSourcesFound={setWaterSources}
       />
       <TracePanel 
         onDistributorChange={setDistributor}
         onShowDistributorPopup={setShowDistributorPopup}
         onUserLocationChange={setUserLocation}
         routeEmissions={routeEmissions}
+        waterSources={waterSources}
       />
     </div>
   );
