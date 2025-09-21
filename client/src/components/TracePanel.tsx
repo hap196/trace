@@ -51,6 +51,7 @@ export default function TracePanel({
   const [distributor, setDistributor] = useState<any>(null);
   const [distributorLoading, setDistributorLoading] = useState(false);
   const [isManualLocation, setIsManualLocation] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -274,7 +275,128 @@ export default function TracePanel({
 
   return (
     <div className="absolute top-6 left-6 bg-white/15 backdrop-blur-xl shadow-2xl rounded-2xl p-8 w-96 h-[380px] z-10 border border-white/20 flex flex-col">
-      {!showResults ? (
+      {showDashboard ? (
+        <>
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-ultra-violet mb-1">
+                dashboard
+              </h2>
+              <button
+                onClick={() => setShowDashboard(false)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 border border-white/30 hover:border-white/50 transition-all duration-200 text-ultra-violet font-medium text-sm"
+              >
+                <IoArrowBack className="w-4 h-4" />
+                <span>back</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-3">
+            <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+              <h3 className="text-sm font-semibold text-ultra-violet mb-2">
+                Your Carbon Footprint
+              </h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-gray">This month:</span>
+                  <span className="text-lg font-bold text-ultra-violet">
+                    2.4 kg CO₂
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-gray">This year:</span>
+                  <span className="text-sm font-medium text-ultra-violet">
+                    28.7 kg CO₂
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+              <h3 className="text-sm font-semibold text-ultra-violet mb-2">
+                Recent Traces
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-ultra-violet font-medium">
+                      Dasani - Philadelphia
+                    </p>
+                    <p className="text-ash-gray">3 hours ago</p>
+                  </div>
+                  <span className="text-cambridge-blue font-medium">
+                    4.147 kg CO₂
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-ultra-violet font-medium">
+                      SmartWater - Fairfax
+                    </p>
+                    <p className="text-ash-gray">3 hours ago</p>
+                  </div>
+                  <span className="text-cambridge-blue font-medium">
+                    4.201 kg CO₂
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-ultra-violet font-medium">
+                      Aquafina - New York
+                    </p>
+                    <p className="text-ash-gray">3 hours ago</p>
+                  </div>
+                  <span className="text-cambridge-blue font-medium">
+                    3.547 kg CO₂
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+              <h3 className="text-sm font-semibold text-ultra-violet mb-2">
+                Environmental Impact
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-gray">
+                    Microplastics consumed:
+                  </span>
+                  <span className="text-ultra-violet font-medium">
+                    142 particles
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-gray">Water usage:</span>
+                  <span className="text-ultra-violet font-medium">57.2 L</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-gray">
+                    Equivalent trees to offset:
+                  </span>
+                  <span className="text-cambridge-blue font-medium">
+                    1.2 trees
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/15 rounded-xl border border-white/20">
+              <h3 className="text-sm font-semibold text-ultra-violet mb-2">
+                Your Locations
+              </h3>
+              <div className="space-y-1 text-xs">
+                <p className="text-slate-gray">Most traced location:</p>
+                <p className="text-ultra-violet font-medium">
+                  San Francisco, CA
+                </p>
+                <p className="text-ash-gray">12 traces this month</p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : !showResults ? (
         <>
           <div className="mb-4">
             <div className="flex items-center justify-between">
@@ -288,25 +410,33 @@ export default function TracePanel({
                   trace
                 </h2>
               </div>
-              <button
-                onClick={handleAuth}
-                disabled={isLoading}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 border border-white/30 hover:border-white/50 transition-all duration-200 text-ultra-violet font-medium text-sm disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <AiOutlineLoading3Quarters className="w-4 h-4 animate-spin" />
-                ) : isAuthenticated ? (
-                  <>
-                    <IoLogOut className="w-4 h-4" />
-                    <span>logout</span>
-                  </>
-                ) : (
-                  <>
-                    <IoLogIn className="w-4 h-4" />
-                    <span>login</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 border border-white/30 hover:border-white/50 transition-all duration-200 text-ultra-violet font-medium text-sm"
+                >
+                  <span>view dashboard</span>
+                </button>
+                <button
+                  onClick={handleAuth}
+                  disabled={isLoading}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 border border-white/30 hover:border-white/50 transition-all duration-200 text-ultra-violet font-medium text-sm disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <AiOutlineLoading3Quarters className="w-4 h-4 animate-spin" />
+                  ) : isAuthenticated ? (
+                    <>
+                      <IoLogOut className="w-4 h-4" />
+                      <span>logout</span>
+                    </>
+                  ) : (
+                    <>
+                      <IoLogIn className="w-4 h-4" />
+                      <span>login</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
