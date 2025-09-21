@@ -6,7 +6,7 @@ import { IoCloudOutline } from "react-icons/io5";
 import { IoWaterOutline } from "react-icons/io5";
 import { IoFlaskOutline } from "react-icons/io5";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import { IoLogIn, IoLogOut } from "react-icons/io5";
+import { IoLogIn, IoLogOut, IoLocationOutline } from "react-icons/io5";
 
 type CarbonData = {
   co2: number;
@@ -23,6 +23,7 @@ export default function TracePanel() {
   const [showResults, setShowResults] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -55,7 +56,6 @@ export default function TracePanel() {
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Check for auth changes every 2 seconds when component is mounted
     const interval = setInterval(checkAuthStatus, 2000);
 
     return () => {
@@ -70,6 +70,53 @@ export default function TracePanel() {
       window.location.href = "http://localhost:3001/logout";
     } else {
       window.location.href = "http://localhost:3001/login";
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    setIsLocationLoading(true);
+
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by this browser.");
+      setIsLocationLoading(false);
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000,
+          });
+        }
+      );
+
+      const { latitude, longitude } = position.coords;
+
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&types=place`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+          const place = data.features[0];
+          const address = place.place_name || place.text;
+          setLocation(address);
+        } else {
+          setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+      } else {
+        setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      }
+    } catch (error) {
+      console.error("Error getting location:", error);
+      alert("Unable to get your location. Please enter it manually.");
+    } finally {
+      setIsLocationLoading(false);
     }
   };
 
@@ -191,16 +238,36 @@ export default function TracePanel() {
                 htmlFor="location"
                 className="block text-sm font-semibold text-ultra-violet mb-3"
               >
-                location (optional)
+                location
               </label>
-              <input
-                id="location"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g., new york, ny"
-                className="w-full p-3 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet placeholder-slate-gray font-medium shadow-sm transition-all"
-              />
+              <div className="relative">
+                <input
+                  id="location"
+                  type="text"
+                  value={location}
+                  readOnly
+                  onClick={getCurrentLocation}
+                  placeholder={
+                    isLocationLoading
+                      ? "Getting location..."
+                      : "Click here to enable location"
+                  }
+                  className="w-full p-3 pr-12 border border-white/25 rounded-xl focus:ring-2 focus:ring-cambridge-blue focus:border-transparent bg-white/30 backdrop-blur-sm text-ultra-violet placeholder-slate-gray font-medium shadow-sm transition-all cursor-pointer hover:bg-white/40"
+                />
+                <button
+                  type="button"
+                  onClick={getCurrentLocation}
+                  disabled={isLocationLoading}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-lg hover:bg-white/20 transition-all duration-200 disabled:opacity-50 pointer-events-none"
+                  title="Get current location"
+                >
+                  {isLocationLoading ? (
+                    <AiOutlineLoading3Quarters className="w-4 h-4 animate-spin text-ultra-violet" />
+                  ) : (
+                    <IoLocationOutline className="w-4 h-4 text-ultra-violet" />
+                  )}
+                </button>
+              </div>
             </div>
             <button
               type="submit"
