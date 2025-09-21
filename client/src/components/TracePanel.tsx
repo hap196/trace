@@ -7,10 +7,10 @@ import { IoWaterOutline } from "react-icons/io5";
 import { IoFlaskOutline } from "react-icons/io5";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
 import { IoLogIn, IoLogOut, IoLocationOutline } from "react-icons/io5";
-import { 
-  calculateTotalEmissions, 
-  type RouteEmissions, 
-  type TotalEmissions 
+import {
+  calculateTotalEmissions,
+  type RouteEmissions,
+  type TotalEmissions,
 } from "@/utils/emissionCalculations";
 
 type CarbonData = {
@@ -38,7 +38,9 @@ export default function TracePanel({
   const [drink, setDrink] = useState("water");
   const [location, setLocation] = useState("");
   const [results, setResults] = useState<CarbonData | null>(null);
-  const [totalEmissions, setTotalEmissions] = useState<TotalEmissions | null>(null);
+  const [totalEmissions, setTotalEmissions] = useState<TotalEmissions | null>(
+    null
+  );
   const [isCalculating, setIsCalculating] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -89,9 +91,11 @@ export default function TracePanel({
 
   useEffect(() => {
     if (results && routeEmissions) {
-      // Check if we have at least one route emission calculated
-      const hasRouteData = routeEmissions.lastMile || routeEmissions.distribution || routeEmissions.manufacturing;
-      
+      const hasRouteData =
+        routeEmissions.lastMile ||
+        routeEmissions.distribution ||
+        routeEmissions.manufacturing;
+
       if (hasRouteData) {
         const total = calculateTotalEmissions(results, routeEmissions);
         setTotalEmissions(total);
@@ -216,8 +220,7 @@ export default function TracePanel({
 
     setResults(footprint);
     setIsCalculating(false);
-    
-    // Don't show results immediately - wait for route emissions to be calculated
+
     setTimeout(() => {
       if (onShowDistributorPopup) {
         onShowDistributorPopup(true);
@@ -389,100 +392,72 @@ export default function TracePanel({
                       </span>
                     </div>
                     <p className="text-lg font-bold text-ultra-violet">
-                      {totalEmissions ? totalEmissions.total.co2 : results.co2} kg
+                      {totalEmissions ? totalEmissions.total.co2 : results.co2}{" "}
+                      kg
                     </p>
                   </div>
                 </div>
 
-                <div className="p-3 bg-white/15 rounded-xl border border-white/20">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-slate-gray/20 rounded-full flex items-center justify-center">
-                        <IoFlaskOutline className="w-4 h-4 text-slate-gray" />
-                      </div>
-                      <span className="text-sm font-medium text-ultra-violet">
-                        microplastics
-                      </span>
-                    </div>
-                    <p className="text-lg font-bold text-ultra-violet">
-                      {totalEmissions ? totalEmissions.total.microplastics : results.microplastics} μg
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white/15 rounded-xl border border-white/20">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-ash-gray/20 rounded-full flex items-center justify-center">
-                        <IoWaterOutline className="w-4 h-4 text-ash-gray" />
-                      </div>
-                      <span className="text-sm font-medium text-ultra-violet">
-                        water usage
-                      </span>
-                    </div>
-                    <p className="text-lg font-bold text-ultra-violet">
-                      {totalEmissions ? totalEmissions.total.waterUsage : results.waterUsage} L
-                    </p>
-                  </div>
-                </div>
-
-                {totalEmissions && totalEmissions.transportation.co2 > 0 && (
+                {totalEmissions && (
                   <div className="p-3 bg-white/15 rounded-xl border border-white/20">
-                    <div className="mb-2">
-                      <h4 className="text-sm font-semibold text-ultra-violet mb-1">
-                        Transportation Emissions
+                    <div className="mb-3">
+                      <h4 className="text-sm font-semibold text-ultra-violet mb-2">
+                        Breakdown
                       </h4>
                     </div>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-gray">Product emissions:</span>
+                        <span className="text-slate-gray">
+                          Product manufacturing:
+                        </span>
                         <span className="text-ultra-violet font-medium">
-                          {totalEmissions.baseProduct.co2} kg CO₂
+                          {totalEmissions.baseProduct.co2} kg
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-gray">Transportation:</span>
-                        <span className="text-ultra-violet font-medium">
-                          {totalEmissions.transportation.co2} kg CO₂
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-gray">Total distance:</span>
-                        <span className="text-ultra-violet font-medium">
-                          {totalEmissions.transportation.totalDistance} km
-                        </span>
-                      </div>
-                      <div className="border-t border-white/30 pt-2 flex justify-between items-center">
-                        <span className="text-ultra-violet font-semibold">Total emissions:</span>
-                        <span className="text-ultra-violet font-bold">
-                          {totalEmissions.total.co2} kg CO₂
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {distributor && (
-                  <div className="p-3 bg-white/15 rounded-xl border border-white/20">
-                    <div className="mb-2">
-                      <h4 className="text-sm font-semibold text-ultra-violet mb-1">
-                        Your Local Distributor
-                      </h4>
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      <p className="text-ultra-violet font-medium">
-                        {distributor.bottlerOwner}
-                      </p>
-                      <p className="text-slate-gray">
-                        {distributor.fullAddress || distributor.salesCenter}
-                      </p>
-                      <p className="text-slate-gray">{distributor.phone}</p>
-                      {distributor.geocoded && (
-                        <p className="text-ash-gray text-xs">
-                          {distributor.coordinates.lat.toFixed(4)},{" "}
-                          {distributor.coordinates.lng.toFixed(4)}
-                        </p>
+                      {routeEmissions?.lastMile && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-gray">
+                            Last mile ({routeEmissions.lastMile.distance} km):
+                          </span>
+                          <span className="text-ultra-violet font-medium">
+                            {routeEmissions.lastMile.co2Emissions} kg
+                          </span>
+                        </div>
                       )}
+
+                      {routeEmissions?.distribution && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-gray">
+                            Distribution ({routeEmissions.distribution.distance}{" "}
+                            km):
+                          </span>
+                          <span className="text-ultra-violet font-medium">
+                            {routeEmissions.distribution.co2Emissions} kg
+                          </span>
+                        </div>
+                      )}
+
+                      {routeEmissions?.manufacturing && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-gray">
+                            Manufacturing (
+                            {routeEmissions.manufacturing.distance} km):
+                          </span>
+                          <span className="text-ultra-violet font-medium">
+                            {routeEmissions.manufacturing.co2Emissions} kg
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="border-t border-white/30 pt-2 flex justify-between items-center">
+                        <span className="text-ultra-violet font-semibold">
+                          Total CO₂:
+                        </span>
+                        <span className="text-ultra-violet font-bold">
+                          {totalEmissions.total.co2} kg
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
