@@ -40,11 +40,21 @@ export default function MapboxMap({
   const [distributorPopup, setDistributorPopup] =
     useState<mapboxgl.Popup | null>(null);
   const [userMarker, setUserMarker] = useState<mapboxgl.Marker | null>(null);
+  const [productionMarker, setProductionMarker] =
+    useState<mapboxgl.Marker | null>(null);
+  const [manufacturingMarker, setManufacturingMarker] =
+    useState<mapboxgl.Marker | null>(null);
   const [routeSource, setRouteSource] = useState<mapboxgl.GeoJSONSource | null>(
     null
   );
+  const [productionRouteSource, setProductionRouteSource] =
+    useState<mapboxgl.GeoJSONSource | null>(null);
+  const [manufacturingRouteSource, setManufacturingRouteSource] =
+    useState<mapboxgl.GeoJSONSource | null>(null);
   const currentUserLocation = useRef<{ lat: number; lng: number } | null>(null);
   const currentDistributor = useRef<any>(null);
+  const currentProductionCenter = useRef<Location | null>(null);
+  const currentManufacturingCenter = useRef<Location | null>(null);
 
   const geocodeAddress = async (address: string) => {
     try {
@@ -85,9 +95,90 @@ export default function MapboxMap({
   };
 
   const getMarkerColor = (type: string) => {
-    if (type === "sales") return "#545775";
+    if (type === "sales") return "#718F94";
     if (type === "production") return "#90B494";
     return "#DBCFB0";
+  };
+
+  const findClosestProductionCenter = async (distributorLocation: {
+    lat: number;
+    lng: number;
+  }) => {
+    if (!locations.length) return null;
+
+    let closestCenter = null;
+    let minDistance = Infinity;
+
+    for (const location of locations) {
+      if (location.type === "production") {
+        const coords = await geocodeAddress(location.address);
+        if (coords) {
+          const distance = calculateDistance(
+            distributorLocation.lat,
+            distributorLocation.lng,
+            coords.lat,
+            coords.lng
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestCenter = { ...location, coordinates: coords };
+          }
+        }
+      }
+    }
+
+    return closestCenter;
+  };
+
+  const findClosestManufacturingCenter = async (productionLocation: {
+    lat: number;
+    lng: number;
+  }) => {
+    if (!locations.length) return null;
+
+    let closestCenter = null;
+    let minDistance = Infinity;
+
+    for (const location of locations) {
+      if (location.type === "manufacturing") {
+        const coords = await geocodeAddress(location.address);
+        if (coords) {
+          const distance = calculateDistance(
+            productionLocation.lat,
+            productionLocation.lng,
+            coords.lat,
+            coords.lng
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestCenter = { ...location, coordinates: coords };
+          }
+        }
+      }
+    }
+
+    return closestCenter;
+  };
+
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
   const addLocationMarkers = async () => {
@@ -174,7 +265,7 @@ export default function MapboxMap({
     }
 
     const marker = new mapboxgl.Marker({
-      color: "#545775",
+      color: "#718F94",
       scale: 1.2,
     })
       .setLngLat([distributor.coordinates.lng, distributor.coordinates.lat])
@@ -204,6 +295,32 @@ export default function MapboxMap({
           );
         }, 1000);
       }
+
+      setTimeout(async () => {
+        const closestProduction = await findClosestProductionCenter(
+          distributor.coordinates
+        );
+        if (closestProduction) {
+          currentProductionCenter.current = closestProduction;
+          addProductionCenterMarker(closestProduction);
+          addProductionRoute(
+            closestProduction.coordinates,
+            distributor.coordinates
+          );
+
+          const closestManufacturing = await findClosestManufacturingCenter(
+            closestProduction.coordinates
+          );
+          if (closestManufacturing) {
+            currentManufacturingCenter.current = closestManufacturing;
+            addManufacturingCenterMarker(closestManufacturing);
+            addManufacturingRoute(
+              closestManufacturing.coordinates,
+              closestProduction.coordinates
+            );
+          }
+        }
+      }, 1500);
     }
 
     setDistributorMarker(marker);
@@ -227,6 +344,134 @@ export default function MapboxMap({
       .addTo(map.current);
 
     setUserMarker(marker);
+  };
+
+  const addProductionCenterMarker = (
+    productionCenter: Location & { coordinates: { lat: number; lng: number } }
+  ) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (productionMarker) {
+      productionMarker.remove();
+    }
+
+    const marker = new mapboxgl.Marker({
+      color: "#90B494",
+      scale: 1.1,
+    })
+      .setLngLat([
+        productionCenter.coordinates.lng,
+        productionCenter.coordinates.lat,
+      ])
+      .addTo(map.current);
+
+    const popup = new mapboxgl.Popup({
+      offset: 25,
+      className: "frosted-popup",
+    }).setHTML(`
+      <div style="
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+      ">
+        <h3 style="
+          margin: 0 0 8px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #2c3e50;
+          line-height: 1.3;
+        ">${productionCenter.name}</h3>
+        <p style="
+          margin: 0 0 8px 0;
+          font-size: 14px;
+          color: #5a6c7d;
+          line-height: 1.4;
+        ">${productionCenter.address}</p>
+        <p style="
+          margin: 0;
+          font-size: 12px;
+          font-weight: 500;
+          color: #90B494;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        ">Production Center</p>
+      </div>
+    `);
+
+    marker.setPopup(popup);
+    setProductionMarker(marker);
+  };
+
+  const addManufacturingCenterMarker = (
+    manufacturingCenter: Location & {
+      coordinates: { lat: number; lng: number };
+    }
+  ) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (manufacturingMarker) {
+      manufacturingMarker.remove();
+    }
+
+    const marker = new mapboxgl.Marker({
+      color: "#DBCFB0",
+      scale: 1.1,
+    })
+      .setLngLat([
+        manufacturingCenter.coordinates.lng,
+        manufacturingCenter.coordinates.lat,
+      ])
+      .addTo(map.current);
+
+    const popup = new mapboxgl.Popup({
+      offset: 25,
+      className: "frosted-popup",
+    }).setHTML(`
+      <div style="
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+      ">
+        <h3 style="
+          margin: 0 0 8px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #2c3e50;
+          line-height: 1.3;
+        ">${manufacturingCenter.name}</h3>
+        <p style="
+          margin: 0 0 8px 0;
+          font-size: 14px;
+          color: #5a6c7d;
+          line-height: 1.4;
+        ">${manufacturingCenter.address}</p>
+        <p style="
+          margin: 0;
+          font-size: 12px;
+          font-weight: 500;
+          color: #DBCFB0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        ">Manufacturing Center</p>
+      </div>
+    `);
+
+    marker.setPopup(popup);
+    setManufacturingMarker(marker);
   };
 
   const addDrivingRoute = async (
@@ -277,7 +522,7 @@ export default function MapboxMap({
             "line-cap": "round",
           },
           paint: {
-            "line-color": "#545775",
+            "line-color": "#545775", // ultra-violet color
             "line-width": 4,
           },
         });
@@ -288,6 +533,136 @@ export default function MapboxMap({
       }
     } catch (error) {
       console.error("Error fetching driving route:", error);
+    }
+  };
+
+  const addManufacturingRoute = async (
+    manufacturingLocation: { lat: number; lng: number },
+    distributorLocation: { lat: number; lng: number }
+  ) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (!map.current.isStyleLoaded()) {
+      setTimeout(
+        () => addManufacturingRoute(manufacturingLocation, distributorLocation),
+        500
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${manufacturingLocation.lng},${manufacturingLocation.lat};${distributorLocation.lng},${distributorLocation.lat}?geometries=geojson&access_token=${accessToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+
+        if (map.current.getSource("manufacturing-route")) {
+          if (map.current.getLayer("manufacturing-route")) {
+            map.current.removeLayer("manufacturing-route");
+          }
+          map.current.removeSource("manufacturing-route");
+        }
+
+        map.current.addSource("manufacturing-route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: route.geometry,
+          },
+        });
+
+        map.current.addLayer({
+          id: "manufacturing-route",
+          type: "line",
+          source: "manufacturing-route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#545775", // ultra-violet color
+            "line-width": 3,
+          },
+        });
+
+        setManufacturingRouteSource(
+          map.current.getSource("manufacturing-route") as mapboxgl.GeoJSONSource
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching manufacturing route:", error);
+    }
+  };
+
+  const addProductionRoute = async (
+    productionLocation: { lat: number; lng: number },
+    distributorLocation: { lat: number; lng: number }
+  ) => {
+    if (!map.current) {
+      return;
+    }
+
+    if (!map.current.isStyleLoaded()) {
+      setTimeout(
+        () => addProductionRoute(productionLocation, distributorLocation),
+        500
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${productionLocation.lng},${productionLocation.lat};${distributorLocation.lng},${distributorLocation.lat}?geometries=geojson&access_token=${accessToken}`
+      );
+
+      const data = await response.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+
+        if (map.current.getSource("production-route")) {
+          if (map.current.getLayer("production-route")) {
+            map.current.removeLayer("production-route");
+          }
+          map.current.removeSource("production-route");
+        }
+
+        map.current.addSource("production-route", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {},
+            geometry: route.geometry,
+          },
+        });
+
+        map.current.addLayer({
+          id: "production-route",
+          type: "line",
+          source: "production-route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#545775", // ultra-violet color
+            "line-width": 3,
+          },
+        });
+
+        setProductionRouteSource(
+          map.current.getSource("production-route") as mapboxgl.GeoJSONSource
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching production route:", error);
     }
   };
 
@@ -367,9 +742,23 @@ export default function MapboxMap({
         if (userMarker) {
           userMarker.remove();
         }
+        if (productionMarker) {
+          productionMarker.remove();
+        }
+        if (manufacturingMarker) {
+          manufacturingMarker.remove();
+        }
         if (map.current.getSource("route")) {
           map.current.removeLayer("route");
           map.current.removeSource("route");
+        }
+        if (map.current.getSource("production-route")) {
+          map.current.removeLayer("production-route");
+          map.current.removeSource("production-route");
+        }
+        if (map.current.getSource("manufacturing-route")) {
+          map.current.removeLayer("manufacturing-route");
+          map.current.removeSource("manufacturing-route");
         }
         map.current.remove();
         map.current = null;
